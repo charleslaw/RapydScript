@@ -15,36 +15,59 @@ JSON = JSON or {}
 
 # implement JSON.stringify in older browsers, if doesn't already exist
 if not JSON.stringify:
-    JS("""
-    JSON.stringify = function(obj) {
-        var t = typeof (obj);
-        if (t != "object" || obj === null) {
-            // simple data type
-            if (t == "string")
-                obj = '"' + obj + '"';
-            if (t == "function")
-                return; // return undefined
-            else
-                return String(obj);
-        } else {
-            // recurse array or object
-            var n, v, json = []
-            var arr = (obj && obj.constructor == Array);
-            for (n in obj) {
+    JSON.stringify = def(obj):
+        t = typeof (obj);
+        if (t == "function" or t == "undefined"):
+            #return undefined
+            return
+
+        if (t == "string" or (t == "object" and obj and obj.constructor == String) ):
+            escape = /["\\\x00-\x1f\x7f-\x9f]/g
+            meta = {
+                '\b': '\\b',
+                '\t': '\\t',
+                '\n': '\\n',
+                '\f': '\\f',
+                '\r': '\\r',
+                '"': '\\"',
+                '\\': '\\\\'
+            }
+            if obj.match(escape):
+                obj = obj.replace(escape, def (a):
+                    c = meta[a]
+                    if (typeof(c) == 'string'):
+                        return c;
+                    c = a.charCodeAt();
+                    return '\\u00' + Math.floor(c / 16).toString(16) + (c % 16).toString(16)
+                )
+            return '"' + obj + '"'
+        if (t != 'object' or obj == null):
+            return JS("String(obj)")
+
+        if (obj and (obj.constructor == Number or obj.constructor == Boolean)):
+            return JS("String(obj)")
+
+        #recurse array or object
+        json = []
+        arr = (obj and obj.constructor == Array)
+        #Need a better way to do this, specifically the for loop
+        JS("""
+        for (n in obj)
+        {
+            if (Object.prototype.hasOwnProperty.call(obj, n)) {
                 v = obj[n];
-                t = typeof (v);
-                if (t != "function" && t != "undefined") {
-                    if (t == "string")
-                        v = '"' + v + '"';
-                    else if ((t == "object" || t == "function") && v !== null)
-                        v = JSON.stringify(v);
-                    json.push((arr ? "" : '"' + n + '":') + String(v));
+                if (arr || v !== undefined) {
+                    var vc = JSON.stringify(v);
+                    if (vc === undefined) {
+                        vc = null;
+                    }
+                    json.push((arr ? '' : '"' + n + '":') + String(vc));
                 }
             }
-            return (arr ? "[" : "{") + String(json) + (arr ? "]" : "}");
         }
-    };
-    """)
+        """)
+        return (arr ? "[" : "{") + JS("String(json)") + (arr ? "]" : "}");
+
 
 # Pythonic shortcut for converting an object to string
 str = JSON.stringify
